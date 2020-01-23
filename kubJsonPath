@@ -1,0 +1,322 @@
+Copy : Ctrl+Insert
+Paste: Ctrl+Insert
+
+###
+$cat /etc/kubernetes/manifests/kubi-apiserver.yaml   //Location of file to view api-server options in kubeadmn setup.||kube-controller-manager,kube-scheduler
+$cat /etc/systemd/system/kube-apiserver.service      //Location of file to view api-server options in non kubeadmn setup
+$ps -aux | grep kube-apiserver
+
+$kubectl get pods -n kube-system                    // To list pods in system namespace that will show the scheduler aswell
+$kubectl get daemonset -n kube-system               // To list daemon of kube-system namespace
+
+$kubectl run nginx --image=nginx --generator=run-pod/v1
+$kubectl describe pod <pod name>
+$kubectl edit pod <pod name>
+$kubectl get pod <pod name> -o yaml > my-new-pod.yaml   //To output the pod definition to a file
+$kubectl get all  // To get all objects
+$kubectl get pods --all-namespaces   //Get pods from all namespaces
+$kubectl get pods --selector env=dev,bu=finance,tier=frontend // To use selector to get PODS in dev environment with business unit finance and tier is frontend
+$kubectl run --restart=Never --image=busybox static-busybox --dry-run -o yaml --command -- sleep 1000 > /etc/kubernetes/manifests/static-busybox.yaml  //To create static pod
+
+$kubectl run --generator=run-pod/v1 nginx --image=nginx --labels=tier=web --dry-run -o yaml > nginx-definition.yml // To create yaml file
+$kubectl run --generator=run-pod/v1 messaging --image=redis:alpine -l tier=msg
+
+Install
+*******
+$git clone https://github.com/kodekloudhub/kubernetes-metrics-server.git  // This will download from git to current working directory
+$cd kubernetes-metrics-server  // To change directory and ensure all the required binaries are downloaded
+$kubectl create -f .  // To deploy metrics-server by creating all the components within the current directory 
+
+Deployment
+**********
+$kubectl create deployment webapp --image=kodekloud/webapp-color   // To create deployment using image
+$kubectl scale deployment/webapp --replicas=3                      // To scale deployments once its created
+$kubectl edit deployment <deployment name>                  // To edit any field/property of POD template, every change the deployment will automatically delete and create new pod
+$kubectl exec --namepsace=kube-public curl -- sh -c 'test=`wget -q0- -T 2 http://webapp-service.default.svc.cluster.local:8080/info 2>&1` && echo "$test OK" || echo "Failed"'   //Test the deployment
+$kubectl run --generator=run-pod/v1 test-np --image=busybox:1.28 --rm -it -- sh // To create busybox to test the connectivity from a container using nc command below
+$nc -z -v -w 2 np-test-service:80  //To check port connectivity
+
+
+Replicaset
+**********
+$kubectl get replicationcontroller
+$kubectl get replicaset
+$kubectl replace -f replicaset-definition.yml      // To apply changes of the definition file
+$kubectl scale --replicas=6 replicaset <name>      // Another way to scale using the TYPE and NAME
+$kubectl edit replicaset new-replica-set
+$kubectl get replicaset new-replica-set -o yaml
+$kubectl delete pods --all-namespaces
+$kubectl autoscale rs frontend --max=10
+
+Namespaces
+***********
+$kubectl create namespace <namespace>    // Create namespace
+$kubectl get pods -n <namespace>
+$kubectl config set-context $(kubectl config current-context) --namespace=<namespace>
+$kubectl config use-context prod-user@production
+$kubectl config view
+$kubectl config view --kubeconfig=my-kube-config   //Display config of custom kube config
+//Namespaces - Default, kube-system, kube-public
+mysql.connect("<service-name>.<namespace>.svc.cluster.local")
+
+Resource Quota
+**************
+$kubectl create -f compute-quota.yml
+
+Services
+********
+Types: NodePort, ClusterIP, LoadBalancer, ExternalName
+NodePort Kubernetes Service: Range (30000-32767). To service multiple pods it uses random alogarithm for Load Balance and Session affinity. 
+$kubectl create -f service-definition.yml
+$kubectl get services
+$kubectl describe service <service name>   \\ To get the target port and other details
+$curl http://<node ip>:<node port>   \\ To access the service created using node IP & port. This will connect to the app running in the pod
+
+$kubectl expose pod nginx --port=80 --name nginx-service --dry-run -o yaml \\Create a Service named nginx of type NodePort to expose pod nginx's port 80 on port 30080 on the nodes. Add the node port manually in the yaml file.
+$kubectl expose deployment webapp --type=NodePort --port=8080 --name=webapp-service --dry-run -o yaml > webapp-service.yml
+$kubectl run --generator=run-pod/v1 test-nslookup --image=busybox:1.28 --rm -it -- nslookup webapp-service > /root/nginx.svc  \\This will create app to test the webservice and delete pod
+$kubectl run --generator=run-pod/v1 test-nslookup --image=busybox:1.28 --rm -it -- nslookup 10-32-0-5.default.pod > /root/nginx.svc  \\This will create app to test the POD with IP address 
+
+Scheduler
+*********
+$curl --header "Content-Type:application/json" --request POST --data http://$SERVER/api/v1/namespaces/default/pods/$PODNAME/binding/
+$kubectl describe node node01    // To find Taints, Annotations, Roles, Conditions, Unschedulable, System Info
+$kubectl taint nodes node01 spray=mortein:NoSchedule  // To create a taint on node01 with key of 'spray', value of 'mortein' and effect of 'NoSchedule'
+$kubectl taint nodes master node-role.kubernetes.io/master:NoSchedule- // Remove existing taint(node-role.kubernetes.io/master:NoSchedule) on master
+$kubectl label nodes <node-name> <label-key>=<label-value>    // To label Nodes such as size=Large, use size=Large in POD file to run POD that matches the label using nodeSelector
+$wget https://storage.googleapis.com/kubernetes-release/release/v1.12/0/bin/linux/amd64/kube-scheduler  // Deploy Scheduler.  "kube-scheduler.service"
+$kubectl logs <scheduler-name> --name-space=kube-system   // View scheduler logs
+
+DaemonSets
+**********
+$kubectl get daemonsets                         \\DaemonSets used case is to have monitoring agent pod on all nodes. Created by kube-api server(daemonset controller)
+$kubectl describe daemonsets monitoring-daemon
+
+Log & Monitor
+**************
+$kubectl get events
+$kubectl top nodes   // To view performance metrics of the top nodes
+$kubectl top pods    // To view performance metrics of the top pods
+$kubectl logs -f <pod name> <optional container name if pod has multiple containers>
+$kubectl get pods webapp -o jsonpath='{.spec.containers[*].name}*'  //TO get all the containers in a POD
+$kubectl get pv --sort-by=.spec.capacity.storage \\ To sort persistent volume based on the capacity
+$kubectl get pv --sort-by=.spec.capacity.storage -o=custom-columns=NAME:.metadata.name,CAPACITY:.spec..capacity.storage \\ To get only NAME & CAPACITY column from kubectl output
+$kubectl config view --kubeconfig=my-kube-config -o jsonpath="{.contexts[?(@.context.user=='aws-user')].name} \\To search for aws-user in the kubeconfig file
+$kubectl exec -it app cat /log/app.log  // To run commands inside a container
+$kubectl logs web -f --previous  //To watch previous POD logs.
+$journalctl -u etcd.service -l  \\ To view logs if the cluster was setup in a hardway. $journalctl -u kubelet
+
+Application Lifecycle
+*********************
+$kubectl rollout status deployment/<deployment name>
+$kubectl rollout history deployment/<deployment name>   \\Rollout strategy: Recreate, RollingUpdate
+$kubectl rollout undo deployment/<deployment name>
+
+
+Docker Commands
+***************
+$docker run ubuntu       //Command will download the image but container remains in exited stage
+$docker ps -a  // List all docker containers even in exited state
+$docker run -d kodecloud/event-simulator  // To run a docker container in a detached mode
+$docker logs -f ecf  // Live logs
+
+// "Command" field in kubernetes overwrites ENTRYPOINT in docker, "args" overwrites CMD in docker
+https://towardsdatascience.com/search?q=learn-enough-docker-to-be-useful
+
+
+$kubectl create configmap <config-name> --from-literal=<key>=<value>  \\ kubectl create configmap app-config --from-literal=APP_COLOR=blue
+$kubectl create configmap <config-name> --from-file=<path to file>
+$kubectl get configmaps
+$kubectl describe configmaps
+
+$kubectl create secret generic <secret-name> --from-literal=<key>=<value>
+$kubectl create secret generic --from-literal=DB_HOST=mysql --from-literal=DB_USER=root --from-literal=DB_Password=paswrd
+$kubectl create secret generic <secret-name> --from-file=<path to file>
+$kubectl get secrets
+$kubectl describe secrets
+$kubectl get secret <secret name> -o yaml  \\ To get the values of the secret 
+
+$echo -n 'mysql' | base64  \\ Result is hashed text(to encode) which needs to be copied to secrets file
+$echo -n 'bXlzcWw=' | base64 --decode \\ Result is plain text(decoded) 
+   
+Kubernetes Cluster Upgrade
+**************************
+$kubectl drain node-1   \\ Will terminate pods and recreate on another node. Node marked as unschduleable. Used for node maintenance
+$kubeadm version -o short  \\ TO check version of the kubeadm
+$kubeadm upgrade plan    \\ TO view the current and stable versions, also list each component version
+$apt install kubeadm=1.12.0-00 \\ You can use this when packages are already download and available on the local host
+$apt-get upgrade -y kubeadm=1.12.0-00 \\download packages
+$kubeadm upgrade apply v1.12.0 \\ Upgrade one miner version at a time
+$apt install kubelet=1.12.0-00  \\ You can use this when packages are already download and available on the local host
+$apt-get upgrade -y kubelet=1.12.0-00 \\download kubelet packages
+$kubeadm upgrade node config --kubelet-version $(kubelet --version | cut -d ' ' -f 2)  \\ Only use on worker nodes
+$systemctl restart kubelet
+$kubectl uncordon node-1 \\ To schedule the pods again after maintenance
+## $kubectl cordon node-2   \\ Mark node as unscheduleable, however the existing pods will not be terminated.
+## $kubectl drain node02 --ignore-daemonsets --force  \\ To drain node forcefully
+
+Backup & Recover
+****************
+$kubectl get all --all-namespace -o yaml > all-deploy-services.yaml  \\ To backup all the kubernetes objects(Resource configuration)
+$ETCDCTL_API=3 etcdctl snapshot save snapshot.db  \\ To take backup(snapshot) of the ETCD database. File is saved in the current working directory
+$ETCDCTL_API=3 etcdctl snapshot save snapshot.db --endpoints=https://127.0.0.1:2379 --cacert=/etc/etcd/ca.crt --cert=/etc/etcd/etcd-server.crt --key=/etc/etcd/etcd-server.key  \\ Save the etcd snapshot and certificates
+$ETCDCTL_API=3 etcdctl snapshot status snapshot.db \\ Check the status of the snapshot
+$service kube-apiserver stop  \\ Service has to be stopped before restore of ETCD
+$ETCDCTL_API=3 etcdctl snapshot restore snapshot.db --data-dir /var/lib/etcd-from-backup --initial-cluster master-1=https://192.168.5.11:2380,master-2=https://192.168.5.12:2380 --initial-cluster-token etcd-cluster-1 --initial-advertise-peer-urls https://${INTERNAL_IP}:2380
+$systemctl daemon-reload
+$service etcd restart
+$service kube-apiserver start
+
+Security
+********
+$kubectl create serviceaccount sa
+$kubectl list serviceaccount
+$curl -v -k https://localhost:6443/api/v1/pods -u "user1:password123"  \\Authenticate into the kube-api server
+
+$openssl genrsa -out dilip.key 1024               \\ Generate private key
+$openssl rsa -in dilip.key -pubout > dilip.pem     \\ Generate public key
+$openssl req -new -key dilip.key -out dilip.csr -subj "/C=US/ST=CA/O=MyOrg, Inc./CN=my-bank.com"  \\ To raise CSR(certificate signing request), that needs to be validated, Sign and Send certificate by Certificate Authority(CA). Keys are managed by PKI(Public Key Infrastructure)
+$openssl x509 -in /etc/kubernetes/pki/apiserver.crt -text -noout  \\ This will display the certificate details
+$kubectl get csr                     \\ To get list of pending csr approval
+$kubectl certificate approve jane    \\ To approve csr for jane
+$kubectl get csr jane -o yaml        \\ To view jane certificate 
+$echo "<copy the certificate from above command>" | base64 --decode  \\ To decode certificate in plain text format and then send it to the user
+
+
+
+#### CA Certificate
+$openssl genrsa -out ca.key 2048    \\ Generate Keys ca.key
+$openssl req -new -key ca.key -subj "/CN=KUBERNETES-CA" -out ca.csr  \\ Certificate Signing Request ca.csr
+$openssl x509 -req -in ca.csr -signkey ca.key -out ca.crt    \\ Sign certificates ca.crt
+#### ADMIN USER
+$openssl genrsa -out admin.key 2048    \\ Generate Keys ca.key
+$openssl req -new -key admin.key -subj "/CN=kube-admin/O=system:masters" -out admin.csr  \\ Certificate Signing Request ca.csr
+$openssl x509 -req -in admin.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out admin.crt    \\ Sign certificates ca.crt
+$curl https://kube-apiserver:6443/api/v1/pods --key admin.key --cert admin.crt --cacert ca.crt  \\ API access using admin key cert
+
+$openssl x509 -in /etc/kubernetes/pki/etcd/server.crt -text -noout   \\Display the certificate details in plain text
+
+Authentication mechanism: Static Password File, Static Token File, Certificates, Identity Services
+Certificate(Public Key): server.crt, server.pem | client.crt, client.pem
+Private Key: server.key, server-key.pem  | client.key, client-key.pem
+Kubernetes Server certificate components - KUBE-API, ETCD, KUBELET.  Kubernetes Client certificate - ADMIN, KUBE-SCHEDULER, KUBE-CONTROLLER-MANAGER, KUBE-PROXY
+
+Groups
+******
+API Groups: /version, /api, /apis, /logs, /metrics, /healthz
+$kubectl proxy         \\ To start http proxy agent listen on 8001 by default so don't have to use certificate information in the following curl commands
+$curl http://localhost:8001 -k   \\ Will list all the groups
+$curl http://localhost:8001/apis -k | grep name  \\ Will list all the name's
+
+$kubectl get roles
+$kubectl get rolebindings
+$kubectl describe role developer
+$kubectl auth can -i create deployments  \\ To check if you have access to create deployments
+$kubectl auth can -i create deployments --as dev-user  \\ To check if user "dev-user" has access to create deployment
+$kubectl api-resources --namespaced=true  \\ To give the comprehensive list of the Namespaced scope resources. When set to false it lists Cluster scoped.
+$kubectl exec ubuntu-sleeper whoami       \\ To check the user who has executed pod
+$kubectl create role developer --resource=pods --verb=create,list,get,update,delete -n=development  \\Create Role
+$kubectl create rolebinding developer-role-binding --role=developer --user=john -n=development  \\Create Rolebinding
+
+##Namespaced scoped resources: pods, replicasets, jobs, deployments, services, secrets, roles, rolebindings, configmaps, PVC
+##Cluser scoped resources: nodes, PV, clusterroles, clusterrolebindings, certificatesigningrequests, namespaces
+
+$docker login private-registry.io                  \\Login to private registry using username password
+$docker run private-registry.io/apps/internal-app  \\Once logged in you can download images
+$kubectl create secret docker-registry <secretname> --docker-server=private-registry.io --docker-username=registry-user --docker-password=registry-password --docker-email=registry-user@email.com
+
+\\Docker Storage Drivers: Storage Drivers, Volume Drivers. Commonly used drivers:AUFS,ZFS,BTRFS,Device Mapper,Overlay,Overlay2
+
+https://github.com/mmumshad/kubernetes-the-hard-way/tree/master/tools    \\Kubernetes Certificate Health Check Spreadsheet
+
+Volumes
+*******
+$docker volume create data_volume  \\To create the volume which creates directory in default location- /var/lib/docker/volumes/data_volume
+$docker run -v data_volume:/var/lib/mysql mysql   \\ Volume Mount - Volume mounting to default directory on the docker host to data in /var/lib/mysql inside the container
+$docker run --mount type=bind,source=/data/mysql,target=/var/lib/mysql mysql    \\ Bind Mount - Mount directory on docker host to the directory in the container
+
+$kubectl get persistentvolume       \\ List Persistent Volumes
+$kubectl get persistentvolumeclaim   \\ List PVC in the current namespace. PVC is a chunk of the PV
+
+Network
+*******
+$ip link     \\ To list interfaces.  $ip addr to list IP address.   check /proc/sys/net/ipv4/ip_forward if the interface forwarding is enabled. value should be set to 1
+$ip addr add 192.168.1.10/24 dev eth0   \\To add ip address to an interface. Update /etc/network/interface to make it persistent
+$ip route show default   \\ To display default gateway
+$ip route add 192.168.1.0/24 via 192.168.2.1  \\ Add route to the table. Connect to devices in 192.168.1.0/24 range using the gateway 192.168.2.1      $ip route   to display routes
+$ip add netns  \\ To add Network namespace
+$ip addr show weave \\ TO get the POD IP address if weave bridge networking solution is implemented
+$arp   \\ To get the MAC address, HWaddress
+$ip netns exec <Network namespace name> arp  \\ To list entries within the container
+$ip link add veth-red type veth peer name veth-blue  \\To create pipe between two Network Namespaces. veth are the virtual interface names
+$ip link set veth-red netns red      \\ To map above created pipe to the virtual interface of the Network namespace
+$ip -n red addr add 192.168.15.1 dev veth-red  \\ Assign IP to the virtual interface in the namespace red
+$ip -n red link set veth-red up  \\ To bring up the link 
+$ip netns exec red ping 192.168.15.2  \\ TO ping other network namespace 
+$ip link add v-net-0 type bridge  \\ TO add another interface with type bridge
+$netstat -plnt  \\ TO get the port services are listening 
+$netstat -anp   \\ To see all the established connection
+$docker network ls \\ LIs the docker network details along with drivers
+$iptables -nvL -t nat  \\ To list NAT rules
+$iptables -t nat -A POSTROUTING -S 192.168.15.0/24 -j MASQUERADE
+$iptables -L -t net | grep db-service   \\ To get NAT rules for the db-service
+
+$ps -aux | grep kubelet \\ To find the CNI details and network plugin
+$ls /opt/cni/bin    \\ Lists binaries for the cni. 
+$ls /etc/cni/net.d  \\ Lists the cni configuration files ex:10-bridge.conf
+
+$kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 |tr -d '\n')"  \\To deploy Weave as a deamonset
+$kubectl get pods -n kube-system   \\To get the Weave pod details if configured with kubeadm
+$kubectl logs weave-net-5gcmb weave -n kube-system  \\ To fetch logs for troubleshooting
+$kubectl logs kube-proxy-ft6n7 -n kube-system  \\To check for the type of proxy configured
+ 
+$kube-proxy --proxy-mode [userspace |iptables|ipvs]   \\Default IPtables
+$cat /var/log/kube-proxy.log  \\To check for the service IP details and proxy mode used
+
+FQDN for service: hostname(web-service).namespace(apps).Type(svc).Root(cluster.local)  http://web-service.apps.svc.cluster.local
+$cat /etc/coredns/Corefile  \\On the master node to view the CoreDNS configuration
+$cat /var/lib/kubelet/config.yaml \\ Has got the details of the DNS server and domain name
+
+Ingress Controller -> Deployment, Service, ConfigMap, Auth 
+$kubectl get ingress 
+ 
+ 
+Kubeadm for on-prem, GKE for GCP, Kops for AWS, AKS(Azure Kubernetes Service) for Azure
+kube-controller-manager --leader-elect true 
+cat /etc/systemd/system/kube-apiserver.service    \\Config details of the api server including the IP address of the etc servers
+
+### Install etcd
+$wget -q --https-only "https://github.com/coreos/etcd/releases/download/v3.3.9/etcd-v3.3.9-linux-amd64.tar.gz"   \\ Download the packages
+$tar -xvf etcd-v3.3.9-linux-amd64.tar.gz
+$mv etcd-v3.3.9-linux-amd64/etcd* /usr/local/bin
+$mkdir -p /etc/etcd /var/lib/etcd
+$cp ca.perm kubernetes-key.pm kubernetes.pem /etc/etcd/
+$cat /etc/systemd/system/etcd.service
+
+$service kube-apiserver status  \\ Check kube-apiserver if installed as a service
+$service kube-controller-manager status  \\ Check kube-controller if installed as a service
+$service kube-scheduler status  \\ Check kube-scheduler if installed as a service
+$service kubelet status  \\ Check kubelet if installed as a service
+$service kube-proxy status  \\ Check kube-proxy if installed as a service
+
+kubeadm Install
+***************
+master$sudo apt-get update && sudo apt-get install -y apt-transport-https curl
+curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+cat <<EOF | sudo tee /etc/apt/sources.list.d/kubernetes.list
+deb https://apt.kubernetes.io/ kubernetes-xenial main
+EOF
+master$sudo apt-get update
+master$sudo apt-get install -y kubelet kubeadm kubectl
+master$sudo apt-mark hold kubelet kubeadm kubectl
+master$kubeadm init
+master$mkdir -p $HOME/.kube
+master$sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+master$sudo chown $(id -u):$(id -g) $HOME/.kube/config
+master$kubectl token create --print-join-command
+node01$kubeadm join 172.17.0.68:6443 --token fnsf6v.3o5y2mornabe92xx --discovery-token-ca-cert-hash sha256:38af75c714b4a8c571f9547ac8df1705616253d93967d03a50bfdfbda73a9d6f
+master$sysctl net.bridge.bridge-nf-call-iptables=1
+node01$sysctl net.bridge.bridge-nf-call-iptables=1
+master$kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+ 
+$curl  https://192.168.5.30:6443/version -k  \\To get the Kubernetes version info using curl
