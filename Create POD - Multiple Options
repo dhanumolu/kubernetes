@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: Pod
+metadata:
+name: myapp-pod
+namespace: default
+labels:
+app: myapp
+type: front-end
+spec:
+containers:
+
+name: nginx-container
+image: nginx
+ports:
+containerPort: 8080
+command: [“sleep”,“3600”]
+volumeMounts:
+mountPath: /opt
+name: data-volume
+volumes:
+name: data-volume
+To store it on a shared storage
+hostPath:
+path: /data
+type: Directory
+
+To store it in AWS
+awsElasticBlockStore:
+volumeID:
+fsType: ext4
+
+To use PersistentVolumeClaims in PODs
+volumes:
+- name: mypd
+persistentVolumeClaim:
+claimName: myclaim
+
+To add security and container level.
+securityContext:
+runAsUser: 1000
+capabilities:
+add: [“MAC_ADMIN”]
+
+To use when sececrets are to be passed to fetch image from private repository
+imagePullSecrets:
+
+name: secretname
+Multi container. Types: SIDECAR, ADAPTER, AMBASSADOR
+name: log-agent
+image: log-agent
+resources:
+requests:
+memory: “1Gi”
+cpu: 1
+limits:
+memory: “2Gi”
+cpu: 2
+Initcontainers, only exits for a certain task and process completes
+initContainers:
+
+name: init-myservice
+image: busybox
+command: [‘sh’, ‘-c’, ‘git clone ; done;’]
+schedulerName: kube-scheduler-master
+nodeName: node01
+nodeSelector:
+size: Large
+affinity:
+nodeAffinity:
+requiredDuringSchedulingIgnoreDuringExecution:
+nodeSelectorTerms:
+- matchExpressions:
+- key: size
+operator: NotIn
+values:
+- Small
+- Medium
