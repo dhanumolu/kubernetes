@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: simple-webapp-color
+spec:
+   containers:
+   - name: simple-webapp-color
+     image: simple-webapp-color
+     ports:
+ 
+ ## ENV value   
+  env:
+   - name: APP_COLOR
+     value: pink
+     
+ ## ENV value from configmap
+    env:
+   - name: APP_COLOR
+     valueFrom:   
+        configMapKeyRef:
+           name: app-config
+           key: APP_COLOR
+        
+  ## ENV value from secret
+    env:
+   - name: APP_COLOR
+     valueFrom:   
+        secretKeyRef:      
+        
+   ## ConfigMap in Pods
+    envFrom:
+    - configMapRef: 
+      name: app-config
+     valueFrom:   
+        secretKeyRef:        
+        
+    ## Inject secret in Pods
+    envFrom:
+    - secretRef: 
+      name: app-secret
+     valueFrom:   
+        secretKeyRef: 
+            name: app-secret
+            key: DB_Password            
+            
+   ################ Secrets in Pods as Volumes
+        volume:
+        - name: app-secret-volume
+          secret:
+             secretName: app-secret 
